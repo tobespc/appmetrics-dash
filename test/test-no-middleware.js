@@ -13,40 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
+
 'use strict';
 
 // Test framework.
 const request = require('request');
 const tap = require('tap');
-const util = require('util');
 
-const appmetrics = require('appmetrics');
-appmetrics.start();
+var dash = require('../');
 
-tap.test('runs dashboard on ephemeral port', function(t) {
-  var server = require('../').monitor({
-    appmetrics: appmetrics,
-    port: 0,
-    host: '127.0.0.1',
-    console: {
-      log: function() { /* ignore */ },
-      error: function() { /* ignore */ },
-    },
+dash.attach(
+  // not setting any middleware
+);
+
+var http = require('http');
+
+const port = 3000;
+
+const requestHandler = (request, response) => {
+  response.end('Hello');
+};
+
+const server = http.createServer(requestHandler);
+
+server.listen(port, err => {
+  if (err) {
+    return console.log('An error occurred', err);
+  }
+  console.log(`Server is listening on ${port}`);
+});
+
+tap.test('test with no middleware', function(t) {
+  request('http://localhost:3000/appmetrics-dash', function(
+    err,
+    res
+  ) {
+    if (err) {
+      throw err;
+    }
+    if (res.statusCode >= 400) {
+      throw new Error('expected status code < 400. but got > 400');
+    }
+    t.pass();
+    t.end();
   });
+});
 
-  server.on('listening', function() {
-    const a = this.address();
-    const base = util.format('http://%s:%s', a.address, a.port);
-    const options = {
-      url: base + '/appmetrics-dash',
-    };
-    t.equal(a.address, '127.0.0.1');
-    t.comment(util.inspect(options));
-    request(options, function(err, resp, body) {
-      t.ifError(err);
-      t.equal(resp.statusCode, 200);
-      t.similar(body, /DOCTYPE html/);
-      server.close(t.end);
-    });
-  });
+tap.test('stop', function(t) {
+  server.close(t.end);
 });
